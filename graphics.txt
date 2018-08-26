@@ -1,0 +1,852 @@
+5/29
+
+Aim: Shading models
+
+- How/when we calculate the color for our shapes
+- Flat shading
+	- calculate I once per polygon
+- Gouraud Shading
+	- calculate I there times per polygon (at the vertices)
+	- interpolate I in scanline conversion and draw line
+- Phong Shading
+	- calculate I once per pixel
+	- interpolate the vertex normal in scanline conversion and draw line
+- Calculating surface normals for Gouraud & Phong Shading
+	- every point on a polygon has the same surface normal
+	- Vertex Normal	
+		- normal value calculated by combining the surface normals of all polygons that share the same vertex
+		- combination of all surface normals for polygons that share a common vertex
+		- create a hash table of vertices: normals 
+		- update as you go through the polygon list (every three; triple)
+		- at the end, we will normalize all the vertex normals
+		- we should normalize the surface normals before adding them to the vertex normal 
+
+
+-------------------------------------------------------------------------------------
+
+5/21
+
+3-Pass
+1. setup
+2. vary
+3. draw
+
+in 2. vary --> structure for storing knob values
+
+- order of knobs should not matter
+- frames array : only have to add entries for knobs that are present in the vary command
+- don't apply knob or just leave it at 0 if missing vary command
+
+-------------------------------------------------------------------------------------
+
+5/17
+
+Aim: Animation
+
+- generate multiple frames with small differences between each
+- apply transofmrations over time
+	- based on original state
+	- modifiers
+- vary: 
+	- define knob behavior
+	- knob: m0
+	- start frame: 0
+	- end frame: 4
+	- start value: 0
+	- end value: 1
+- frames
+	- number of total frames in the animation
+- same base name
+	- basename _____
+	
+default framrate for a gif: 100 frames per second
+
+New commands
+
+- transformation args knob
+	- if there is a knob, look up its value and apply it to the arguments
+- basename name
+	- set a basename variable (global...)
+- frames #
+	- set a frame # variable
+- vary knob start frame end frame start val end val rate
+	- compute and store the knob value for each frame
+	
+3-Pass Animation Framework
+1. look for frames basename and vary
+	 set frames and basename, use default basename if none is provided
+	 if vary is present without frames, stop
+2. for each vary commmand
+	 compute and store every frame knob value
+3. normal drawing pass with:
+	 repeat loop for each frame
+	 update knob values in symbol table
+	 if animating, save at the end of each loop, create animation at final end
+
+
+-------------------------------------------------------------------------------------
+
+5/8
+
+Aim: Compilers
+
+Lexers
+- types of language tokens
+	- grouping symbols (;, {}, (), :, \+, ...)
+	- operators
+	- identifiers
+	- keywords
+	- literals
+	- comments
+- outputs a list of tokens
+- tools: c-lex, flex
+
+Compiler Parts
+- lexer
+	- input: source code
+	- output: token list
+- parser (syntactic analyzer)
+	- input: token list
+	- output: syntax tree
+- semantic analyzer
+	- input: syntax tree
+	- output: operation list & symbol table
+	
+Parsers
+- performs syntax analysis
+- checks the token list for valid structure
+- know the grammar of the language
+- outputs a syntax tree
+- tools: in C -- yacc, bison; in Java -- javacc
+
+Semantic Analyzer
+- evaluate the parse tree to create a list of instructions that represent the program
+- create a list of identifiers and associated information (symbol table)
+- type mismatches are caught as the symbol table is created
+- outputs the operation list and symbol table
+
+source code -(lexer)-> token list -(parser)-> syntax tree -(semantic analyzer)-> operation list/symbol table -(optimizer)-> optimized operation list/symbol table -(code generator)-> binary executable
+
+Code generator
+- translate the operation list and symbol table into binary assembly code
+- creates the actual machine instructions
+
+image code --> token list --> syntax tree --> operation list/symbol table --> code generator (call the image creation/manipulation functions) --> image
+
+
+
+-------------------------------------------------------------------------------------
+
+5/7
+
+Aim: Compilers
+
+Source Code --> lexer --> syntactic analyzer --> semantic analyzer --> optimizer* --> code generator --> executable
+
+Lexer
+- performs lexical analysis
+- "knows" the valid keywords, literal formats and identifiier formats
+- does not perform any structural analysis
+- outputs a list of tokens from your source code
+
+code
+int main() {
+	long x = 5 + 6;
+	printf("%d", x);
+	return 0;
+}
+
+token list (list of tokens and in the order they appear)
+- int
+	main
+	(
+	)
+	{
+	long
+	x
+	=
+	5
+	+
+	6
+	;
+	printf
+	etc....
+
+
+-------------------------------------------------------------------------------------
+
+4/26-27
+
+Aim: Lighting
+
+The color of an object is based on:
+1. The reflective properties of the object
+2. The color, intensity, and location of any light sources
+
+Types of Light Sources
+- Ambient
+  - General light in an image
+  - Comes from all locations equally
+- Point Light Source
+  - Comes from a specific location (far away)
+
+Phong Reflection Model
+- Models real world reflection by breaking reflection into 3 parts
+  - Ambient
+  - Diffuse (point source)
+  - Specular (point source)
+- I = Ambient + Diffuse + Specular
+
+Ambient Reflection
+- A: Ambient light (0-255)
+- Ka: constant of ambient reflection (0-1)
+- Ambient = A*Ka
+
+Diffuse Reflection
+- Reflection of a point source
+- Light is reflected back evenly in all directions
+- Matte/dull objects
+
+Calculation
+- L: vector from the surface to the light (L-hat is normalized)
+- θ: angle between N (normal vector to surface) and L
+- cosθ = N-hat • L-hat
+- P: point light color (0-255)
+- Kd: constant of diffuse reflection (0-1)
+- Diffuse = P*Kd*(N-hat • L-hat)
+
+[!reflection](https://upload.wikimedia.org/wikipedia/commons/b/bd/Lambert2.gif)
+
+Specular Reflection
+- Reflects a point source in a specific direction
+- Models glossy/shiny surfaces
+- Strength of a specular reflection is based on:
+  - The angle between R and V (α)
+  - The angle between L and N (θ)
+
+Calculation
+- L: vector from the surface to the light (L-hat is normalized)
+- θ: angle between N (normal vector to surface) and L
+- α: angle between R and V (α)
+- R: reflected vector from the surface
+
+We want R-hat • V-hat
+R = T + S
+S = T - L
+R = T + T - L
+
+Phong Reflection Model
+- I = Ambient + Diffuse + Specular
+	A*Ka + P*Kd(L-hat dot N-hat) + P*Ks[(2(N-hat dot L-hat)N-hat - L-hat) dot V-hat]^x
+	Cos(alpha): R-hat dot V-hat ALSO (2(N-hat dot L-hat)*N-hat - L-hat) dot V-hat
+	R-hat: 2T - L
+	T: (L-hat dot N-hat) * N-hat
+	R-hat: 2(N-hat dot L-hat)*N-hat - L-hat
+	
+Specular = P*Ks[(2(N-hat dot L-hat)*N-hat - L-hat) dot V-hat]^x
+	- X: arbitrary exponent used to simulate how quickly the reflection decreases
+
+-------------------------------------------------------------------------------------
+
+4/18
+
+Aim: Scanline Conversion
+
+- filling in a polygon by drawing consecutive horizontal (or vertical) lines
+- need to find the top, bottom, and middle vertices
+- need to find the endpoints of each scanline
+
+Y: Yb -> Yt; Y += 1
+Xo: on the line BT; Xb -> Xt; X += change in o
+			change in o = Xt - Xb / Yt - Yb
+X1: on BM until Y = Ym then on MT
+	 	X1 += change in 1
+		change in 1 = Xm - Xb / Ym - Yb
+		or change in 1 = Xt - Xm / Yt - Ym
+		X = Xm
+		
+Z-Buffering
+- create a 2-D array of floating point values, where each entry corresponds to a pixel in the screen
+- We store the z-values of every plotted pixel in this array
+- We check new z0values against the z-buffer before plotting
+- We want the initial values in the Z-buffer array to be the lowest floating point number
+- draw_line needs to generate z values
+- scanline conversion needs to generate z values
+- plot needs to look at/modify z buffer
+
+-------------------------------------------------------------------------------------
+
+4/11
+
+Aim: Relative Coordinate System
+
+- currently, we generate triangles/edges first and then apply transformations to those matrices
+- in a RCS, transformations are applied to the "current" coordinate system, which modifies shapes as soon as they are generated
+
+A
+[ 1 0 0 0 
+	0 1 0 0
+	0 0 1 0
+	0 0 0 1 ]
+	
+B - not modifying the shape but changing the coordinate system
+[ 2 0 0 3
+  0 2 0 1
+	0 0 2 0
+	0 0 0 1 ]
+	
+- drawing in a RCS
+	1. generate polygons/edges
+	2. modify those points by the current coordinate system
+	3. draw to the image
+	
+difficult to draw shapes together
+hard to draw shapes and objects that are related
+
+we want independent control + objects to move together
+
+-------------------------------------------------------------------------------------
+
+3/28/18
+
+Aim: Backface Culling
+
+Backface Culling
+- only drawing the polygons that are forward-facing
+- surface normal vector (perpendicular to the surface)
+- view vector (vector from the surface to the viewer)
+- theta is the angle between the normal and view vector
+
+1. calculate surface normal vector
+2. find theta
+3. if -90 degrees < theta < 90 degrees, draw the polygon
+
+1. calculate surface normal vector
+       P0
+      /  \
+     /theta\
+ A	/      \ B	
+	 /        \
+ 	/          \
+ 	P1          \
+							P2
+	
+	N = A x B
+	A = <P1-P0>
+	B = <P2-P0>
+2. find theta
+		N dot V = mag(N)*mag(V)*cos(theta)
+		cos(theta) is + if theta is in the range we want
+		
+		how to find the view vector (V) -> V = <0,0,1>
+		N = <0,0,z>
+		
+		
+
+-------------------------------------------------------------------------------------
+
+3/20/18
+
+Aim: Vector Math
+
+vectors
+- have magnitude and direction
+- <x,y,z>
+
+if both A and B are dotted and both are normalized, then the dot product is just the cos of the angle (because both are unit vectors)
+
+cross product
+- A x B = <AxBz-AzBy, AzBx-AxBz, AxBy-AyBx>
+
+Wireframe
+- shape is defined by connecting points on the surface with edges
+generate sphere -> add sphere -> add edge -> add point
+draw lines -> draw line
+
+Polygon mesh
+- shape is defined by connecting points on the surface with polygons (trianges/quadrilaterals)
+generate sphere -> add sphere -> add polygon -> add point
+draw polygons -> draw line
+
+Polygon matrix -> by vertices of each shape
+
+Points must be in counterclockwise order
+
+Sphere
+
+
+-------------------------------------------------------------------------------------
+
+
+3/13/18
+
+Aim: 3D Shapes
+
+Box, Sphere, Torus
+
+Box
+- defining points
+	- vertices
+- givens
+	- P0 (top left front)
+	- width (x), height (y), depth (z)
+	
+Sphere
+- defining points
+	- points along the surface
+- givens
+	- center
+	- radius
+- generate a sphere by rotating a circle
+	- x, y axis
+	- no z axis
+	
+x rotation
+[ 1 0        0
+  0 cos(phi) -sin(phi)
+	0 sin(phi) cos(phi) ] * circle
+													[ rcos(theta)
+														rsin(theta)
+														theta      ] = sphere
+																					 [ rcos(theta) <x>
+																					 	 rsin(theta)cos(phi) <y>
+																						 rsin(theta)sin(phi) <z> ]
+theta = angle of circle creation (0 -> 2pi)
+phi = angle of circle rotation (0 -> pi)
+
+0R (semicircle)
+
+theta = 0 -> pi
+phi = 0 -> 2pi
+
+- x rotation
+	- x = rcos(theta) + cx
+	- y = rsin(theta)cos(phi) + cy
+	- z = rsin(theta)sin(phi) + cz
+	
+	for phi: 0->2pi
+		for theta: 0->pi
+			x = rcos(theta) + cx
+			y = rsin(theta)cos(phi) + cy
+			z = rsin(theta)sin(phi) + cz
+			
+
+Torus
+- defining points
+	- points on the surface
+- given
+	- small radius of the thickness (r)
+	- bigger radius, from center to the center of the thickness (R)
+	- center point
+- generate the points by translating a circle and then rotating
+- if we translate over x, rotate about y
+- if we translate over y, rotate about x
+
+translating over x, rotating about y
+y rotation
+[ cos(phi)  0 sin(phi)
+  0         1 0
+ 	-sin(phi) 0 cos(phi) ] * circle*
+	  											[ rcos(theta) + R
+														rsin(theta)
+														phi ] = torus
+																		[ cos(phi)*(rcos(theta)+R) + cx
+																			rsin(theta) + cy
+																			-sin(phi)*(rcos(theta+R)) + cz]
+theta: 0->2pi
+phi: 0->2pi
+
+
+
+-------------------------------------------------------------------------------------
+
+3/7/18
+
+Aim: Bezier Curves
+
+- curve of degree n needs n+1 input points
+- line 
+	P(subt) = (1-t)*p0 + t*p1
+	as t:0 -> 1, P(subt) moves along the line
+	
+Q0 moves linearly along P0P1
+Q1 moves linearly along P1P2
+Qt moves linearly along Q0Q1
+
+Q0 = (1-t)*P0 + t*P1
+Q1 = (1-t)*P1 + t*P2
+Qt = (qop)*Q0 + tQ1 = (t-1)^2*P0 + 2*t*(1-t)
+
+Cubic
+
+Rt moves linearly allong R0, R1
+R0 mm
+mves along the qadratic Q0, Q1
+R1 moves along the quadratic Q1Q2
+
+Rt = (1-t)^3*P0 + 3*t*(1-t)^2*P1 + 3*t^2*(1-t)*p2 + t^3*P3
+-> a (t^3) = -P0+3P1-3P2+P3
+-> b (t^2) = 3P0-6P1+3P2
+-> c (t) = -3P0+3P1
+-> d = P0
+
+[ -1  3 -3 1
+	 3 -6  3 0
+	-3  3  0 0
+	 1  0  0 0] * [ P0
+	 								P1
+									P2
+									P3 ] = [ a
+													 b
+													 c
+													 d ]
+
+
+-------------------------------------------------------------------------------------
+
+3/5/18
+
+Aim: Parametric Equations
+
+- Define a curve as a system of equations with an independent variable t
+- x = f(t)
+- y = g(t)
+- z = h(t)
+
+- Line (x0, y0) -> (x1, y1), t:0 -> 1
+	f(t) = (delta)x*t + x0
+	g(t) = (delta)y*t + y0
+	
+- General Parametric framework
+	for t: 0 -> 1
+		x = f(t)
+		y = g(t)
+		z = h(t)
+		add(x,y,z)
+
+- Circles
+x = rcos(theta) + xc (x center)
+y = rsin(theta) + yc (y center)
+theta = 0 to 2pi
+theta = 2pi*t
+
+- Splines
+	- special curves that can be designed to connect smoothly
+	- we will only use cubic splines
+	- hermite, bezier (two types)
+	
+Hermite Curves
+- given information: 
+	- start & end point (p0, p1) <endpoints>
+	- rates of change (r0, r1) at each endpoint
+	f(t) = at^3 + bt^2 + ct + d -> points on the curve
+	f'(t) = 3at^2 + 2bt + c -> rates of change
+	when t = 0
+	f(t) = d -> p0
+	f'(t) = c -> r0
+	when t = 1
+	f(t) = a + b + c + d -> p1
+	f'(t) = 3a + 2b + c -> r1
+	[ 0 0 0 1
+		1 1 1 1	
+		0	0	1	0
+		3	2 1	0	] * [ a
+									b
+									c
+									d ] = [ p0
+							  					p1
+							  					r0
+							  					1 ]
+	H * C = G (matrix multiplication)
+	H^-1 * G = C (inverse matrix multiplication)
+	H^-1 : [  2 -2  1  1
+					 -3  3 -2 -1
+					  0  0  1  0
+					  1  0  0  0 ]
+
+
+-------------------------------------------------------------------------------------
+
+2/26/17
+
+Aim: Transformations
+
+Dilation
+- enlarge or shrink
+- need a point and a scale factor
+- just multiply each x y z by the scale factor
+[ a 0 0 0 
+  0 a 0 0 
+	0 0 a 0
+	0 0 0 1
+] * [
+			x
+			y
+			z
+			1
+		] = [
+					ax
+					ay
+					az
+					1
+				]
+				
+Rotation
+- x = rcos(phi)
+	y = rsin(phi)
+	x1 = rcos(phi+theta) = rcos(phi)cos(theta) - rsin(phi)sin(theta)
+		 = xcos(theta) - ysin(theta)
+	y1 = ycos(theta) + xsin(theta)
+	--> (x,y,z)Rtheta --> (x1,y1,z)
+	rotation of theta degrees about the z axis 
+	
+[ cos(theta) -sin(theta) 0 0
+	sin(theta) cos(theta)  0 0
+	0					 0					 1 0
+	0 				 0 					 0 1
+] * [ x
+			y
+			z
+			1		
+		] = [
+					xcos(theta) - ysin(theta)
+					ycos(theta) + xsin(theta)
+					z
+					1
+				]
+- rotate theta about the x axis
+	y1 = ycos(theta) - zsin(theta)
+	z1 = zcos(theta) + ysin(theta)
+- rotate theta about the y axis
+	z1 = zcos(theta) - xsin(theta)
+	x1 = xcos(theta) + zsin(theta)
+	
+Combining Transformations
+- E: edges
+	T: translate
+	R: rotate
+	S: scale
+- T * E0 = E1
+	R * E1 = E2 (translated, then rotated)
+	S * E2 = E3
+	E3 = S * E2
+					 R * E1
+					 		 T * E0
+	*********** we want to do this -> E3 = (S * R * T) * E0 <reverse order>
+
+
+
+-------------------------------------------------------------------------------------
+
+2/12/18
+
+Aim: Representing Image Data
+
+[Po, P1, P2, .. Pn]
+- edge list (matrix)
+	- each point is added to a list such that every 2 points form a line
+	-> 2d array -> dimensions: rows x columns --> 3 X 3
+		[ x0  x1  x2
+		  y0	y1	y2
+			z0	z1	z2 ]
+			
+Matrix Math For Graphics
+- Matrix Multiplication
+	- # of rows in the second matrix must equal the number of columns in the first matrix
+	- dimensions of resulting matrix: 
+		A x B * B x C = A x C
+		M * N != N * M
+	- [a b c] * [1
+							 2
+							 3] --> [a1 + b2 + c3]
+	- [a b c
+		 d e f
+		 g h i] * [1 2
+		 					 3 4
+							 5 6] --> [a+3b+5c 2a+4b+6c
+							 					 d+3e+5f 2d+4e+6f
+												 g+3h+5i 2g+4h+6i]
+Multiplicative Identity
+- M * I = M
+- square matrix with an all 1 diagonal and zeros everywhere else
+
+Performing Transformations
+- Translation, dilation, rotation (affine transformation)
+	- E: edge matrix
+	- T: transformation matrix
+		E * T or T * E? --> T * E, needs to be a square matrix
+	
+Translation
+- (x,y,z) --T(a,b,c)--> (x+a, y+b, z+c)
+- [1 0 0 a
+	 0 1 0 b
+	 0 0 1 c
+	 0 0 0 1] * [x
+	 						 y
+							 z
+							 1] = [x+a
+							 			 y+b
+										 z+c
+										   1]
+- 4 x 4 * 4 * N --> T * E
+
+
+-------------------------------------------------------------------------------------
+
+2/7/18
+
+Aim: Creating a line in another octant.
+
+Octant 2
+- options: (x,y+1) & (x+1,y+1)
+- midpoint: (x+0.5,y+1)
+- original d: f(X0+0.5,Y0+1) -> 0.5A+B -> A+2B
+- x = X0, y = Y0
+	d = A+2B
+	while (x <= X1)
+		plot(x,y)
+		if (d < 0)
+			x++
+			d+=2B
+		y++
+		d+=2A
+		
+Octant 8
+- options: (x+1,y) & (x+1,y-1)
+- midpoint: (x+1,y-0.5)
+- original d: f(X0+1,Y0-0.5) -> 2A-B
+- x = X0, y = Y0
+	d = 2A-B
+	while (x <= X1)
+		plot(x,y)
+		if (d < 0)
+			y++
+			d+=2B
+		x++
+		d+=2A
+		
+	
+-------------------------------------------------------------------------------------
+
+2/5&6/18
+
+Aim: Creating a line.
+
+Bresenham's Line Algorithm
+- 8 octants (divided by y=-x and y=x)
+- 1 pixel per x value
+- Assume: Drawing a line in octant I
+	* slope -> 0 < m < 1
+- Let's say we want to draw a line between (X0,Y0) and (X1,Y1)
+	* start out with a pixel at (X0,Y0)
+	* pixel options -> (x+1,y+1) & (x+1,y) 
+	* f(x,y) = 0 if (x,y) is on the line
+	* smaller value means closer to the line -> f(x+1,y+1) or f(x+1, y)
+	* f(x+1,y+0.5) = 0 -> midpoint is on the line, draw either pixel
+								 > 0 -> midpoint is above the line, draw the lower pixel
+								 < 0 -> midpoint is below the line, draw the upper pixel
+- How to test (x+1,y+0.5)
+	y = mx+b
+	0 = mx-y+b
+	0 = (cY)x-(cX)y+(cX)b
+	let A = cY, B = -cX, C = cY(b)
+	0 = Ax + By + C
+	f(x,y) = Ax + By + C
+- When f(x,y) is above the line, < 0
+	When f(x,y) is below the line, > 0
+- When x++, d+=A
+- When y++, d+=B
+- First draft algorithm: (X0,Y0) -> (X1,Y1)
+	x = X0, y = Y0
+	d = f(x+1,y+0.5)
+	while (x <= X1)
+		plot(x,y)
+		x++
+		if (d>0)
+			y++
+		d = f(x+1,y+0.5)
+- Second draft algorithm: (X0,Y0) -> (X1,Y1)
+	x = X0, y = Y0
+	d = f(x+1,y+0.5)
+	while (x <= X1)
+		plot(x,y)
+		if (d > 0)
+			y++
+			d+=B
+		x++
+		d+=A
+- d = f(x+1,y+0.5)
+	d = A+0.5B
+	2d = 2A + B
+	-> increment everything else by 2
+		- 2d = 2(d+A)
+		- 2d = 2(d+B)
+- Third draft algorithm: (X0,Y0) -> (X1,Y1)
+	x = X0, y = Y0
+	d = 2A+B
+	while (x <= X1)
+		plot(x,y)
+		if (d > 0)
+			y++
+			d+=2B
+		x++
+		d+=2A
+	
+-------------------------------------------------------------------------------------	
+
+2/1/18
+
+Aim: Peering into the depths of color.
+
+Image File Formats
+- Uncompressed vs. Compressed (Raster)
+	* Uncompressed formats contain data for each pixel
+		- BMP, TIFF, RAW
+	* Compresed formats use a compression algorithm to minimize file size
+	* Lossless v. Lossy
+		- Lossless compression algorithms contain enough information to exactly recreate the original image
+			* PNG (Portable Network Graphics), GIF (Graphics Interchange Format)
+		- Lossy compression algorithms do not retain all the details of the original image
+			* JPEG (Joint Photographic Experts Group)
+		
+1. PPM (Portable PixMap)
+	1. Lossless, uncompressed raster format
+	2. Pixel data is represented by RGB triplets in either ASCII or binary
+	3. All whitespace is equivalent
+	4. example file:
+		1. P3 (ASCII) or P6 (binary)
+		2. 4 3 (4 pixels by 3 pixels size)
+		3. 255 (max value for any color)
+		4. 255 0 0  255 0 0  255 0 0  255 0 0 (Raster grid of pixels)
+		5. 0 255 0  0 255 0  0 255 0  0 255 0 (Raster grid of pixels)
+		6. 0 0 255  0 0 255  0 0 255  0 0 255 (Raster grid of pixels)
+		
+---------------------------------------------------------------------------------------
+
+1/31/18
+
+Aim: Peering into the depths of color.
+
+Color Depth
+- the amount of data used to represent a single pixel
+	size				color options
+	1 bit				1 color, on | off
+	2 bits			1 color, on | off, plus 1 bit for intensity
+	3 bits			red, green, blue, on | off
+	4 bits			RGB with intensity
+	6 bits			RGB, each color has its own intensity
+	3 bytes			RGB, each with 256 possible intensities
+	
+Other Color Spaces
+- RGBA
+	* Red, Green, Blue + Alpha (transparency)
+- HSB
+	* Hue, Saturation, Brightness
+	
+Image File Formats
+- Raster vs. Vector
+	* Vector formats represent images as a series of drawing instructions
+		- infinitely scalable
+		- SVG (scalable vector graphics)
+	* Raster formats represent images as a grid of pixels
+		
